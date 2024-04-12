@@ -60,7 +60,7 @@ class PDWorld:
             self.world[(x, y)] += self.agent_blocks[agent]
             self.agent_blocks[agent] = 0
         
-    def prandom(self, agent):
+    def prandom(self, agent, qTableAgent):
         # Check if pickup and dropoff are applicable
         pickup_applicable = self.can_pickup(agent)
         dropoff_applicable = self.can_dropoff(agent)
@@ -76,12 +76,13 @@ class PDWorld:
             # If neither pickup nor dropoff is applicable, choose random action
             action = random.choice(["norht", "south", "east", "west"])  # Adjust choices as needed
 
-        #in here 
+        #in here need to update q-table for specific agent w/ bellman func
+        # Q_table[(current_state, action)] += alpha * (reward + gamma * max_q_next - Q_table[(current_state, action)])
 
         return action
 
 
-    def pexploit(self, agent, q_values):
+    def pexploit(self, agent, q_values, qTableAgent):
         # Check if pickup and dropoff are applicable
         pickup_applicable = self.can_pickup(agent)
         dropoff_applicable = self.can_dropoff(agent)
@@ -100,7 +101,7 @@ class PDWorld:
             # Break ties by rolling a dice for operators with the same utility
             return random.choice(best_actions)
 
-    def pgreedy(self, agent, q_values):
+    def pgreedy(self, agent, q_values, qTableAgent):
         # Check if pickup and dropoff are applicable
         pickup_applicable = self.can_pickup(agent)
         dropoff_applicable = self.can_dropoff(agent)
@@ -123,11 +124,11 @@ class PDWorld:
         if action is None:
             # If action is not provided, use the specified strategy
             if strategy == "pexploit":
-                action = self.pexploit(agent)
+                action = self.pexploit(agent, None, qTableAgent)
             elif strategy == "pgreedy":
-                action = self.pgreedy(agent)
+                action = self.pgreedy(agent, None, qTableAgent)
             elif strategy == "random":
-                action = self.prandom(agent)
+                action = self.prandom(agent, None, qTableAgent)
             else:
                 raise ValueError("Invalid strategy")
 
@@ -143,8 +144,8 @@ class PDWorld:
 # Example usage:
 
 world = PDWorld()
-# grid size, grid size, num actions
 
+# grid size, grid size, num actions
 q_table_red = np.zeros((5,5,6))
 q_table_blue = np.zeros((5,5,6))
 q_table_black = np.zeros((5,5,6))
@@ -160,9 +161,9 @@ while i < 500:
 # then need to do the 8500 execution loops
 i = 0
 while i < 8500:
-    world.step("red", q_table_red, None, None, "pgreedy")
+    world.step("red", q_table_red, None, None, "random")
     world.step("blue", q_table_blue, None, None, "pgreedy")
-    world.step("black", q_table_black, None, None, "pgreedy")
+    world.step("black", q_table_black, None, None, "pexploit")
     i+=1
 
 # # Perform actions
