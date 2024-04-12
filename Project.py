@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 class PDWorld:
     def __init__(self):
@@ -73,7 +74,9 @@ class PDWorld:
             action = "dropoff"
         else:
             # If neither pickup nor dropoff is applicable, choose random action
-            action = random.choice(["move", "pickup", "dropoff"])  # Adjust choices as needed
+            action = random.choice(["norht", "south", "east", "west"])  # Adjust choices as needed
+
+        #in here 
 
         return action
 
@@ -116,35 +119,57 @@ class PDWorld:
             # Break ties by rolling a dice for operators with the same utility
             return random.choice(best_actions)
 
-    def step(self, agent, action=None, q_values=None, strategy=None):
+    def step(self, agent, qTableAgent, action=None, q_values=None, strategy=None):
         if action is None:
             # If action is not provided, use the specified strategy
             if strategy == "pexploit":
                 action = self.pexploit(agent)
             elif strategy == "pgreedy":
                 action = self.pgreedy(agent)
+            elif strategy == "random":
+                action = self.prandom(agent)
             else:
                 raise ValueError("Invalid strategy")
 
         # Perform action based on the selected action
-        if action == "move":
-            self.move_agent(agent, "north")  # Adjust direction as needed
-        elif action == "pickup":
+        if action == "pickup":
             self.pickup(agent)
         elif action == "dropoff":
             self.dropoff(agent)
         else:
-            raise ValueError(f"Invalid action: {action}")
+            self.move_agent(agent, action)  # Adjust direction as needed
+            # raise ValueError(f"Invalid action: {action}")
 
 # Example usage:
 
 world = PDWorld()
+# grid size, grid size, num actions
 
-# Perform actions
-world.step("red", "move")
-world.step("red", "move")
-world.step("red", "pickup")
+q_table_red = np.zeros((5,5,6))
+q_table_blue = np.zeros((5,5,6))
+q_table_black = np.zeros((5,5,6))
+# print(q_table)
 
-# Get current state
-current_state = world.get_state()
-print("Current state:", current_state)
+# first 500 training loops (fills out qTable for each agent)
+i = 0
+while i < 500:
+    world.step("red", q_table_red, None, None, "random")
+    world.step("blue", q_table_blue, None, None, "random")
+    world.step("black", q_table_black, None, None, "random")
+    i+=1
+# then need to do the 8500 execution loops
+i = 0
+while i < 8500:
+    world.step("red", q_table_red, None, None, "pgreedy")
+    world.step("blue", q_table_blue, None, None, "pgreedy")
+    world.step("black", q_table_black, None, None, "pgreedy")
+    i+=1
+
+# # Perform actions
+# world.step("red", "move")
+# world.step("red", "move")
+# world.step("red", "pickup")
+
+# # Get current state
+# current_state = world.get_state()
+# print("Current state:", current_state)
