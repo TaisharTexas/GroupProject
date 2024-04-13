@@ -1,176 +1,160 @@
-import random
 import numpy as np
+import matplotlib.pyplot as plt
 
-class PDWorld:
-    def __init__(self):
-        self.world = {}
-        self.init_world()
-        self.agent_positions = {"red": (3, 3), "blue": (5, 3), "black": (1, 3)}
-        self.agent_blocks = {"red": 0, "blue": 0, "black": 0}
-        self.reward = {"red": 0, "blue": 0, "black": 0}
+class QLearningAgent:
+    def __init__(self, num_actions, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.99):
+        self.num_actions = num_actions
+        self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
+        self.exploration_rate = exploration_rate
+        self.exploration_decay = exploration_decay
+        self.q_table = np.zeros((25, num_actions))
 
-    def init_world(self):
-        self.block_cells = [(1, 1), (3, 1), (4, 5), (1, 5), (2, 4), (5, 2)]
-        for x in range(1, 6):
-            for y in range(1, 6):
-                self.world[(x, y)] = 0  # 0 represents empty space
+    def choose_action(self, state, policy):
+        if policy == 'PRANDOM':
+            return self.choose_action_prandom(state)
+        elif policy == 'PEXPLOIT':
+            return self.choose_action_pexploit(state)
+        elif policy == 'PGREEDY':
+            return self.choose_action_pgreedy(state)
 
-        for cell in self.block_cells:
-            self.world[cell] = 5  # Initial block count for each cell
-
-    def get_state(self):
-        red_pos = self.agent_positions["red"]
-        blue_pos = self.agent_positions["blue"]
-        black_pos = self.agent_positions["black"]
-        red_block = 1 if self.agent_blocks["red"] > 0 else 0
-        blue_block = 1 if self.agent_blocks["blue"] > 0 else 0
-        black_block = 1 if self.agent_blocks["black"] > 0 else 0
-        blocks = tuple(self.world[cell] for cell in self.block_cells)
-        return red_pos + blue_pos + black_pos + (red_block, blue_block, black_block) + blocks
-
-    def is_valid_move(self, agent, direction):
-        x, y = self.agent_positions[agent]
-        new_x, new_y = x + (direction == "east") - (direction == "west"), y + (direction == "north") - (direction == "south")
-        new_pos = (new_x, new_y)
-        return 1 <= new_x <= 5 and 1 <= new_y <= 5 and new_pos not in self.agent_positions.values()
-
-    def move_agent(self, agent, direction):
-        if self.is_valid_move(agent, direction):
-            x, y = self.agent_positions[agent]
-            new_x, new_y = x + (direction == "east") - (direction == "west"), y + (direction == "north") - (direction == "south")
-            self.agent_positions[agent] = (new_x, new_y)
-
-    def can_pickup(self, agent):
-        x, y = self.agent_positions[agent]
-        return self.world[(x, y)] > 0 and self.agent_blocks[agent] == 0
-
-    def pickup(self, agent):
-        if self.can_pickup(agent):
-            x, y = self.agent_positions[agent]
-            self.agent_blocks[agent] = self.world[(x, y)]
-            self.world[(x, y)] = 0
-
-    def can_dropoff(self, agent):
-        x, y = self.agent_positions[agent]
-        return self.agent_blocks[agent] > 0 and self.world[(x, y)] < 5
-
-    def dropoff(self, agent):
-        if self.can_dropoff(agent):
-            x, y = self.agent_positions[agent]
-            self.world[(x, y)] += self.agent_blocks[agent]
-            self.agent_blocks[agent] = 0
-        
-    def prandom(self, agent, qTableAgent):
-        # Check if pickup and dropoff are applicable
-        pickup_applicable = self.can_pickup(agent)
-        dropoff_applicable = self.can_dropoff(agent)
-
-        if pickup_applicable and dropoff_applicable:
-            # Choose pickup or dropoff randomly
-            action = random.choice(["pickup", "dropoff"])
-        elif pickup_applicable:
-            action = "pickup"
-        elif dropoff_applicable:
-            action = "dropoff"
+    def choose_action_prandom(self, state):
+        if np.random.rand() < self.exploration_rate:
+            return np.random.randint(self.num_actions)
         else:
-            # If neither pickup nor dropoff is applicable, choose random action
-            action = random.choice(["norht", "south", "east", "west"])  # Adjust choices as needed
+            return np.argmax(self.q_table[state])
 
-        #in here need to update q-table for specific agent w/ bellman func
-        # Q_table[(current_state, action)] += alpha * (reward + gamma * max_q_next - Q_table[(current_state, action)])
-
-        return action
-
-
-    def pexploit(self, agent, q_values, qTableAgent):
-        # Check if pickup and dropoff are applicable
-        pickup_applicable = self.can_pickup(agent)
-        dropoff_applicable = self.can_dropoff(agent)
-
-        if pickup_applicable and dropoff_applicable:
-            return "pickup" if random.random() < 0.5 else "dropoff"
-        elif pickup_applicable:
-            return "pickup"
-        elif dropoff_applicable:
-            return "dropoff"
-        else:
-            # Apply the applicable operator with the highest q-value
-            applicable_actions = ["move", "pickup", "dropoff"]
-            max_q_value = max(q_values[action] for action in applicable_actions)
-            best_actions = [action for action in applicable_actions if q_values[action] == max_q_value]
-            # Break ties by rolling a dice for operators with the same utility
-            return random.choice(best_actions)
-
-    def pgreedy(self, agent, q_values, qTableAgent):
-        # Check if pickup and dropoff are applicable
-        pickup_applicable = self.can_pickup(agent)
-        dropoff_applicable = self.can_dropoff(agent)
-
-        if pickup_applicable and dropoff_applicable:
-            return "pickup" if random.random() < 0.5 else "dropoff"
-        elif pickup_applicable:
-            return "pickup"
-        elif dropoff_applicable:
-            return "dropoff"
-        else:
-            # Apply the applicable operator with the highest q-value
-            applicable_actions = ["move", "pickup", "dropoff"]
-            max_q_value = max(q_values[action] for action in applicable_actions)
-            best_actions = [action for action in applicable_actions if q_values[action] == max_q_value]
-            # Break ties by rolling a dice for operators with the same utility
-            return random.choice(best_actions)
-
-    def step(self, agent, qTableAgent, action=None, q_values=None, strategy=None):
-        if action is None:
-            # If action is not provided, use the specified strategy
-            if strategy == "pexploit":
-                action = self.pexploit(agent, None, qTableAgent)
-            elif strategy == "pgreedy":
-                action = self.pgreedy(agent, None, qTableAgent)
-            elif strategy == "random":
-                action = self.prandom(agent, None, qTableAgent)
+    def choose_action_pexploit(self, state):
+        if np.random.rand() < self.exploration_rate:
+            if np.random.rand() < 0.8:
+                return np.argmax(self.q_table[state])
             else:
-                raise ValueError("Invalid strategy")
-
-        # Perform action based on the selected action
-        if action == "pickup":
-            self.pickup(agent)
-        elif action == "dropoff":
-            self.dropoff(agent)
+                return np.random.choice(np.where(self.q_table[state] == np.max(self.q_table[state]))[0])
         else:
-            self.move_agent(agent, action)  # Adjust direction as needed
-            # raise ValueError(f"Invalid action: {action}")
+            return np.argmax(self.q_table[state])
 
-# Example usage:
+    def choose_action_pgreedy(self, state):
+        return np.argmax(self.q_table[state])
 
-world = PDWorld()
+    def update_q_table(self, state, action, reward, next_state):
+        old_q_value = self.q_table[state, action]
+        max_next_q_value = np.max(self.q_table[next_state])
+        new_q_value = old_q_value + self.learning_rate * (reward + self.discount_factor * max_next_q_value - old_q_value)
+        self.q_table[state, action] = new_q_value
 
-# grid size, grid size, num actions
-q_table_red = np.zeros((5,5,6))
-q_table_blue = np.zeros((5,5,6))
-q_table_black = np.zeros((5,5,6))
-# print(q_table)
+    def decay_exploration_rate(self):
+        self.exploration_rate *= self.exploration_decay
 
-# first 500 training loops (fills out qTable for each agent)
-i = 0
-while i < 500:
-    world.step("red", q_table_red, None, None, "random")
-    world.step("blue", q_table_blue, None, None, "random")
-    world.step("black", q_table_black, None, None, "random")
-    i+=1
-# then need to do the 8500 execution loops
-i = 0
-while i < 8500:
-    world.step("red", q_table_red, None, None, "random")
-    world.step("blue", q_table_blue, None, None, "pgreedy")
-    world.step("black", q_table_black, None, None, "pexploit")
-    i+=1
+class Environment:
+    def __init__(self):
+        self.grid_size = 5
+        self.num_agents = 3
+        self.pickup_locations = [(1, 5), (2, 4), (5, 2)]  
+        self.dropoff_locations = [(1, 1), (3, 1), (4, 5)] 
+        self.agent_locations = [(3, 3), (5, 3), (1, 3)]
+        self.agent_colors = ['red', 'blue', 'black']
+        self.agent_blocks = [0, 0, 0]
+        self.blocks_at_pickup = [5, 5, 5]
+        self.max_blocks_at_dropoff = 5
 
-# # Perform actions
-# world.step("red", "move")
-# world.step("red", "move")
-# world.step("red", "pickup")
+    def reset(self):
+        self.agent_locations = [(3, 3), (5, 3), (1, 3)]
+        self.agent_blocks = [0, 0, 0]
+        self.blocks_at_pickup = [5, 5, 5]
 
-# # Get current state
-# current_state = world.get_state()
-# print("Current state:", current_state)
+    def get_state(self, agent_id):
+        agent_loc = self.agent_locations[agent_id]
+        return (agent_loc[0] - 1) * (self.grid_size - 1) + (agent_loc[1] - 1)  
+
+    def move_agent(self, agent_id, action):
+        current_loc = self.agent_locations[agent_id]
+        new_loc = current_loc
+
+        if action == 0:  # Up
+            new_loc = (max(current_loc[0] - 1, 1), current_loc[1])
+        elif action == 1:  # Down
+            new_loc = (min(current_loc[0] + 1, self.grid_size), current_loc[1])
+        elif action == 2:  # Left
+            new_loc = (current_loc[0], max(current_loc[1] - 1, 1))
+        elif action == 3:  # Right
+            new_loc = (current_loc[0], min(current_loc[1] + 1, self.grid_size))
+
+        self.agent_locations[agent_id] = new_loc
+
+        reward = -1
+        if new_loc in self.pickup_locations:
+            pickup_index = self.pickup_locations.index(new_loc)
+            if self.blocks_at_pickup[pickup_index] > 0 and self.agent_blocks[agent_id] == 0:
+                reward += 13
+                self.blocks_at_pickup[pickup_index] -= 1
+                self.agent_blocks[agent_id] += 1
+        elif new_loc in self.dropoff_locations:
+            dropoff_index = self.dropoff_locations.index(new_loc)
+            if self.agent_blocks[agent_id] > 0 and self.agent_blocks[agent_id] < self.max_blocks_at_dropoff:
+                reward += 13
+                self.agent_blocks[agent_id] -= 1
+
+        return reward
+
+def train_agents(env, agents, num_iterations, policy):
+    for iteration in range(num_iterations):
+        env.reset()
+        for agent_id in range(env.num_agents):
+            agent = agents[agent_id]
+            state = env.get_state(agent_id)
+            total_reward = 0
+
+            for _ in range(100):  
+                action = agent.choose_action(state, policy)  # Pass policy to choose_action
+                reward = env.move_agent(agent_id, action)
+                next_state = env.get_state(agent_id)
+                total_reward += reward
+                agent.update_q_table(state, action, reward, next_state)
+                state = next_state
+                if total_reward > 0:  
+                    break
+
+            agent.decay_exploration_rate()
+
+        if iteration % 100 == 0:
+            print("Iteration:", iteration)
+
+def plot_environment(env):
+    grid = np.zeros((env.grid_size, env.grid_size, 3))  
+    for i in range(env.num_agents):
+        x, y = env.agent_locations[i]
+        grid[x-1, y-1] = np.array(plt.get_cmap('tab10')(i))[:3] 
+    for x, y in env.pickup_locations:
+        grid[x-1, y-1] = (0, 1, 0)  
+    for x, y in env.dropoff_locations:
+        grid[x-1, y-1] = (1, 0, 0)  
+
+    plt.imshow(grid)
+    plt.axis('off')
+    plt.show()
+
+if __name__ == "__main__":
+    env = Environment()
+    agents = [QLearningAgent(num_actions=4, learning_rate=0.3, discount_factor=0.5) for _ in range(env.num_agents)]
+    
+    # Experiment 1
+    print("Experiment 1:")
+    train_agents(env, agents, num_iterations=500, policy='PRANDOM')  # Initial training with PRANDOM for 500 steps
+
+    # Switch policy to PRANDOM and continue training for 8500 steps
+    train_agents(env, agents, num_iterations=8500, policy='PRANDOM')
+    plot_environment(env)
+
+    # Switch policy to PGREEDY and continue training for 8500 steps
+    train_agents(env, agents, num_iterations=8500, policy='PGREEDY')
+    plot_environment(env)
+
+    # Switch policy to PEXPLOIT and continue training for 8500 steps
+    train_agents(env, agents, num_iterations=8500, policy='PEXPLOIT')
+    plot_environment(env)
+    # After training for "PEXPLOIT" policy
+    print("Q-table for PEXPLOIT policy:")
+    for agent_id, agent in enumerate(agents):
+        print(f"Agent {agent_id} Q-table:")
+        print(agent.q_table)
+
